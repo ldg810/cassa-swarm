@@ -1,0 +1,8 @@
+Group,Compact setting
+Agent,3D bounded double integrator; primary-sim mass label 0.027 kg; speed/acceleration limits 1.5 m/s and 3.0 m/s^2; collision/safe/safety-influence radii 0.12/0.39/0.85 m.
+Mission,"Arena [-42,42] x [-42,42] x [0.3,2.5] m; altitude bounds 0.4-2.4 m; goal tolerance 0.75 m; completed agents remain in physical traffic."
+Scenarios,"4 Hz nominal communication and obstacle-information updates with dt=0.05 s integration and a 120 s horizon; CASSA local relative-state safety stream is also sampled at 4 Hz; open flock, crossing traffic, merge-split, and 21-obstacle corridor."
+Comm.,"4.0 m radius, 12-neighbor cap; packet loss 0.0/0.1/0.2/0.4; latency 0/50/100/200 ms; communicated-state noise 0.015 m position and 0.025 m/s velocity."
+CASSA filter,"Obstacle margin 0.34 m; command-filter buffer 0.15 m; lookahead 0.90 m; obstacle projection fallback enabled and reported as telemetry; terminal slot spacing 0.50 m; crossing-flow governor radius 1.20 m, clearance scale 0.42 m, speed floors 0.28/0.82, closing trigger 0.03 m/s."
+Sensing,"Main CASSA full sweep: local relative-state safety stream and obstacle information are sampled at 4 Hz; local dropout/delay/noise are zero; no field-of-view, occlusion, missed-detection, or sensor-saturation model."
+Weights,Separation/alignment/cohesion 1.5/0.3/0.08; goal/obstacle/boundary/damping 5.0/2.5/1.1/0.22; safety/closing 2.5/1.0.

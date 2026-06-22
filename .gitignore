@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+results/
+figures/
+paper_assets/figures/
+*.log
+*.tmp
+MUJOCO_LOG.TXT

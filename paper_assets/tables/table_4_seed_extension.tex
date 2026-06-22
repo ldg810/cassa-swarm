@@ -1,0 +1,20 @@
+\begin{table}[t]
+\centering
+\small
+\caption{Hard-condition seed-extension results for CASSA.}
+\label{tab:seed-extension}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrrrrrrrrr}
+\toprule
+Scenario & N & Packet loss & Latency (ms) & Runs & Safety success & T90 & T95 & T99 & Min reached fraction & Mean reached fraction & Inter-agent collisions & Obstacle contacts \\
+\midrule
+Crossing traffic & 200 & 0.4 & 50 & 10 & 1.00 & 55.8 (10/10) & 57.0 (10/10) & 60.0 (10/10) & 1.000 & 1.000 & 0 & 0 \\
+Crossing traffic & 500 & 0.0 & 0 & 10 & 1.00 & 64.0 (10/10) & 66.7 (10/10) & 72.8 (10/10) & 0.998 & 1.000 & 0 & 0 \\
+Obstacle corridor & 1,000 & 0.0 & 0 & 10 & 1.00 & 88.0 (10/10) & 93.9 (10/10) & 107.3 (10/10) & 0.992 & 0.995 & 0 & 0 \\
+Obstacle corridor & 1,000 & 0.0 & 100 & 10 & 1.00 & 87.7 (10/10) & 93.6 (10/10) & 105.8 (9/10) & 0.989 & 0.994 & 0 & 0 \\
+Obstacle corridor & 1,000 & 0.2 & 0 & 10 & 1.00 & 87.5 (10/10) & 93.0 (10/10) & 105.7 (10/10) & 0.991 & 0.996 & 0 & 0 \\
+Obstacle corridor & 1,000 & 0.2 & 100 & 10 & 1.00 & 87.2 (10/10) & 92.4 (10/10) & 103.8 (10/10) & 0.989 & 0.995 & 0 & 0 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}

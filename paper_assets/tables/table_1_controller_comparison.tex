@@ -1,0 +1,22 @@
+\begin{table}[t]
+\centering
+\small
+\caption{Matched 120 s controller comparison under 4 Hz updates.}
+\label{tab:controller-comparison}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrrrrr}
+\toprule
+Controller & Runs & Safety success & T90 & T95 & T99 & Mean reached fraction & Inter-agent collisions & Obstacle contacts \\
+\midrule
+CASSA (Proposed) & 255 & 1.00 & 59.9 (255/255) & 61.9 (255/255) & 66.0 (255/255) & 1.000 & 0 & 0 \\
+Short-horizon predictive surrogate & 255 & 0.89 & 88.0 (165/255) & 91.5 (155/255) & 98.5 (151/255) & 0.877 & 2,053 & 0 \\
+CBF-QP (OSQP pkg.) & 255 & 0.45 & 71.5 (255/255) & 73.5 (255/255) & 77.0 (255/255) & 1.000 & 30,052 & 5,479 \\
+RVO2 package & 255 & 0.24 & 75.5 (229/255) & 80.5 (210/255) & 90.0 (206/255) & 0.961 & 0 & 897,116 \\
+MADER-inspired surrogate & 255 & 0.92 & >120.0 (59/255) & >120.0 (45/255) & >120.0 (19/255) & 0.502 & 772 & 0 \\
+APF & 255 & 0.54 & 73.2 (255/255) & 75.3 (255/255) & 79.2 (242/255) & 0.998 & 4,973 & 997 \\
+Boids & 255 & 0.65 & 83.8 (255/255) & 85.8 (247/255) & 90.5 (196/255) & 0.992 & 2,833 & 886 \\
+No shield & 255 & 0.07 & 55.0 (255/255) & 55.8 (255/255) & 57.0 (255/255) & 1.000 & 11,616 & 293,456 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}

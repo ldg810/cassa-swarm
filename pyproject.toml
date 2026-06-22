@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cassa-swarm"
+version = "1.0.0"
+description = "Simulation code and reproducibility assets for CASSA aerial swarm experiments"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.24",
+  "pandas>=2.0",
+  "matplotlib>=3.7",
+  "PyYAML>=6.0",
+  "tqdm>=4.66",
+  "scipy>=1.10",
+  "osqp>=0.6",
+  "pillow>=10.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

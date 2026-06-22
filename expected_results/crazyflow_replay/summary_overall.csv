@@ -1,0 +1,2 @@
+runs_total,runs_completed,runs_failed,safety_success_rate,mission_success_rate,collision_pairs_total,obstacle_contacts_total,min_reached_fraction,min_inter_agent_distance_m,max_tracking_error_m,median_T90_s,median_T95_s,median_T99_s,T99_reached_runs
+255,255,0,1.0,1.0,0,0,0.995,0.1226977556943893,0.2169328182935714,59.6,61.8125,66.0,255

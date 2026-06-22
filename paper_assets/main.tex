@@ -1,0 +1,354 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{cite}
+\usepackage{graphicx}
+\usepackage{microtype}
+\usepackage{siunitx}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+
+\graphicspath{{figures/}}
+\sisetup{detect-all=true}
+
+\title{\textbf{CASSA: A Scalable Communication-Aware Swarm Safety Architecture for Aerial Robot Navigation}}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Large aerial robot swarms require decentralized navigation that preserves progress when networked neighbor coordination is delayed, lossy, and bandwidth-limited. This paper evaluates CASSA (Communication-Aware Swarm Safety Architecture) as an architecture-level simulation study, rather than a new stand-alone collision-avoidance primitive or formal safety certificate. CASSA separates a degraded nominal communication stream for scalable coordination from an idealized short-range local relative-state safety interface for close-range response, and combines nominal flocking, local shielding, speed governance, acceleration-bounded obstacle filtering, and reported projection-fallback telemetry.
+
+In a matched 120 s sweep with 50--1000 agents, 4 Hz nominal communication, local-safety, and obstacle-information updates, packet loss, latency, and dense obstacle scenarios, CASSA achieved 255/255 simulator-level collision/contact safety successes, zero inter-agent collision pairs, zero obstacle contacts, and T99 reachability in all runs, with median T90/T95/T99 of 59.9/61.9/66.0 s. Baseline and surrogate controller rows showed larger collision, obstacle-contact, or completion failures under the same simulator interface. A Crazyflow dynamics-consistency replay of CASSA references also preserved 255/255 replay safety successes. These results support nominal-communication robustness for the tested architecture under the stated sensing, dynamics, and projection assumptions, not end-to-end perception robustness, hardware validation, strict clearance invariance, or a formal safety guarantee.
+\end{abstract}
+
+\noindent\textbf{Keywords:} aerial robot systems; multi-agent path planning; swarm robotics; collision avoidance; communication delay; safety filter; simulation-based validation
+
+\section{Introduction}
+
+Aerial robot systems are increasingly used in applications where mobility, small footprint, and rapid deployment matter, including inspection, monitoring, logistics, and emergency response. Recent robotics papers show a clear shift from single-robot autonomy toward coordinated systems evaluated under application constraints: collision-aware distributed model predictive control for multi-agent path planning \cite{mun2026collision}, real-time multi-robot planning in cluttered dynamic environments \cite{zeng2026spfempc}, UAV-based patient search and emergency delivery in confined spaces \cite{zhu2026patient}, multi-robot formation for search and rescue \cite{chang2026pomdp}, dynamic multi-robot coverage \cite{sharma2026coverage}, AUV path planning \cite{chen2026auv}, AUV--UAV mutual positioning \cite{matsuda2026auv}, and aerial-perspective perception for smart-city monitoring \cite{ahmed2026aerial}. These studies share a systems-oriented pattern: a robotic task is stated in operational terms, algorithmic components are tied to physical or communication constraints, and evaluation reports both mission performance and failure modes.
+
+Broader robotics and autonomy literature reinforces the same trajectory. Nature and Nature Machine Intelligence have emphasized the broader promise of small autonomous drones and predictive or learning-based aerial swarm flight \cite{floreano2015future,soria2021predictive,zhang2025differentiable}, while Science Robotics has demonstrated optimized drone flocking, autonomous micro-flying swarms in outdoor clutter, and minimal navigation for tiny aerial robots \cite{vasarhelyi2018optimized,zhou2022swarm,mcguire2019minimal}. Foundational survey work frames aerial swarm robotics around local interaction, scalability, and safety constraints \cite{chung2018survey}. Quadrotor trajectory-generation and motion-primitive studies emphasize dynamic feasibility under vehicle limits \cite{mellinger2012trajectory,mueller2015motionprimitive}. Micro-quadrotor swarm experiments show why those vehicle-level constraints matter when many small aerial robots interact in close proximity \cite{kushleyev2013swarm}. Sampling-based and robust feedback planning add the need to reason explicitly about optimality, uncertainty, and safety margins \cite{karaman2011sampling,majumdar2017funnel}. Multiagent trajectory planning and MAV benchmark datasets further motivate repeatable evaluation in dynamic environments with explicit sensing and communication assumptions \cite{tordesillas2022mader,burri2016euroc}. These works motivate simulation studies that treat progress, density, communication, and collision safety as coupled design constraints rather than isolated modules.
+
+The central difficulty considered here is large-scale decentralized navigation. A controller that works for tens of agents may fail for hundreds because local density increases, communication neighborhoods saturate, and transient close approaches become common. The problem is sharper indoors or near obstacles, where a swarm must maintain progress while respecting both inter-agent separation and environment clearance. Communication degradation further complicates the control loop: delayed or dropped neighbor states can make a repulsive or predictive controller react too late, while overly conservative avoidance can prevent enough agents from reaching the mission goal.
+
+Classical flocking and artificial potential field controllers provide simple decentralized baselines. Reynolds-style separation, alignment, and cohesion terms \cite{reynolds1987flocks} are attractive because they rely on local interactions and scale naturally. Artificial potential fields \cite{khatib1986realtime} provide a similarly simple obstacle and goal representation. However, these methods do not by themselves guarantee discrete-time collision avoidance under packet loss and dense obstacle constraints. Consensus and flocking theory \cite{olfati2006flocking} help explain coordinated motion, but deployment-oriented aerial-robot simulations must also address communication delay, limited neighbor counts, finite integration steps, and the tradeoff between conservative safety and terminal throughput. This paper therefore follows the recent robotic-systems emphasis on transparent mechanisms, ablations, and scenario-level failure analysis.
+
+This paper contributes a reproducible simulation-based safety-architecture study of large-scale aerial swarm navigation under degraded nominal communication. The proposed architecture, CASSA, separates communication-based nominal coordination from a modeled short-range local relative-state safety abstraction, then enforces obstacle clearance at the command level through acceleration-bounded braking before state integration. The evaluation uses swarms of 50 to 1000 agents in open flocking, obstacle corridor, crossing traffic, and merge--split scenarios. Baselines include boids, artificial potential fields, a short-horizon predictive surrogate, a MADER-inspired surrogate, and external-package CBF-QP and RVO2 rows. The main contributions are:
+
+\begin{itemize}
+    \item an information-stream decomposition for large aerial swarms, in which degraded, bandwidth-limited nominal communication is used for scalable coordination while close-range pairwise safety is handled by a separate modeled local relative-state abstraction;
+    \item an architecture-level safety pipeline, rather than a new stand-alone avoidance primitive, that combines communication-aware nominal coordination, local pairwise shielding, speed governance, density-aware regulation, and acceleration-bounded obstacle filtering under one simulator interface; and
+    \item a structured simulator-level audit of the complete architecture, including safety, T90/T95/T99 completion time, command-filter telemetry, baseline failure modes, projection-fallback reporting, and Crazyflow replay, with all safety claims conditioned on the stated sensing, dynamics, and projection assumptions.
+\end{itemize}
+
+\subsection{Scope of claims}
+
+The research question is deliberately narrower than end-to-end robustness to all communication and perception failures: can a large aerial swarm maintain simulator-level collision/contact safety and mission progress under degraded nominal communication, provided that close-range pairwise safety is handled by a separate local relative-state abstraction? The paper therefore does not evaluate a complete onboard perception stack. It intentionally separates a delayed/lossy nominal communication stream used for scalable coordination from a short-range local relative-state stream used for close-range safety response. The main experiments degrade the nominal communication stream while holding the local relative-state stream idealized except for 4 Hz sampling and finite safety radius. The reported safety results should therefore be interpreted as nominal-communication robustness evidence conditional on local relative-state availability, not as robustness to field-of-view limits, occlusion, missed detections, estimator delay, or sensor noise.
+
+This separation is a factor-isolation choice. If nominal communication degradation and local relative-state sensing degradation were varied simultaneously, the resulting failures would be difficult to attribute to delayed/lossy coordination, close-range perception loss, or their interaction. The present study therefore holds the local relative-state stream idealized in order to isolate the effect of degraded nominal communication on a large-swarm safety architecture. This choice narrows the claim: the results support robustness to nominal communication degradation under the stated local-safety abstraction, but they do not support robustness to degraded local perception.
+
+The paper's claims are therefore architecture-level and conditional. CASSA is not evaluated as a new stand-alone collision-avoidance law, as a formal continuous-time safety certificate, or as an end-to-end perception-robust aerial-swarm system. It is evaluated as a complete simulator-level control stack under a deliberately separated information model: degraded nominal communication for coordination, and an idealized short-range local relative-state interface for close-range safety. This design allows the study to isolate the effect of nominal communication degradation at large swarm scale, while leaving local-sensing degradation and full perception-stack validation to future work.
+
+The study is simulation-based. The results should therefore be read as evidence for the proposed architecture under the modeled dynamics, information streams, obstacle geometries, and projection assumptions, not as a complete validation of real-world flight performance.
+
+\section{Related work}
+
+\subsection{Multi-robot planning and aerial robotic systems}
+
+Multi-robot planning couples algorithm design, physical feasibility, communication, and task-level performance. Broad swarm-robotics surveys emphasize that scalability and robustness emerge from local interactions, embodiment, and redundancy rather than centralized trajectory assignment alone \cite{dorigo2021swarm,chung2018survey}. Sampling-based optimal planning, funnel-based robust feedback planning, and MADER-style multiagent trajectory planning show complementary ways to reason about feasibility and dynamic obstacles \cite{karaman2011sampling,majumdar2017funnel,tordesillas2022mader}. Recent robotic-systems studies frame the same issue in application-specific terms. Mun and Jang \cite{mun2026collision} use collision-aware adaptive-horizon MPC to reduce computation while preserving safety in multi-agent path planning. Zeng et al. \cite{zeng2026spfempc} address real-time motion planning for multiple robots in cluttered environments with dynamic obstacles and uncertainty. Chang et al. \cite{chang2026pomdp} and Sharma et al. \cite{sharma2026coverage} study search-and-rescue formation and dynamic coverage, respectively, where communication and replanning overhead influence mission completion. These works motivate evaluation protocols that report safety, completion, runtime, and ablation evidence rather than a single success metric.
+
+Aerial robotic systems add further constraints because flight safety must be maintained while sensing, communication, and actuation remain limited. Zhu and Wang \cite{zhu2026patient} study UAV-based patient search and emergency medication delivery in confined spaces, while Matsuda and Yokota \cite{matsuda2026auv} use UAV--AUV mutual positioning to support heterogeneous autonomy. Ahmed et al. \cite{ahmed2026aerial} show that aerial platforms are also used as sensing infrastructure for smart-city monitoring. Quadrotor trajectory-generation, motion-primitive, micro-swarm, and MAV dataset studies provide the physical and evaluation context for this constraint \cite{mellinger2012trajectory,mueller2015motionprimitive,kushleyev2013swarm,burri2016euroc}. High-speed autonomous flight studies further show how onboard perception, simulation transfer, and reinforcement learning can push aerial navigation in cluttered environments beyond conservative low-speed pipelines \cite{loquercio2021learning,kaufmann2023champion}. The present work differs from these task-specific systems by isolating a dense-swarm safety architecture, but follows their emphasis on operational scenarios, quantitative failure modes, and reproducible simulation evidence.
+
+\subsection{Flocking, potential fields, and predictive control}
+
+Bio-inspired flocking controllers remain useful for large swarms because they require only local interactions. Reynolds' model \cite{reynolds1987flocks} and subsequent flocking theory \cite{olfati2006flocking} provide a compact basis for separation, alignment, and cohesion. Large-scale robot self-assembly and morphogenesis studies show that decentralized rules can create coherent group-level structure, but they also illustrate how local errors and density effects can accumulate when many agents interact \cite{rubenstein2014programmable,slavkov2018morphogenesis}. Artificial potential fields \cite{khatib1986realtime} provide a similarly simple obstacle and goal representation, and hybrid path-planning systems such as A*-MPPO-DWA \cite{chen2026auv} show how global search and local reactive planning can be combined. However, potential fields and purely reactive planners can produce local minima, close-range oscillations, or deadlock, particularly in dense corridors. Optimization-based planners such as collision-aware MPC \cite{mun2026collision} and SPF-EMPC \cite{zeng2026spfempc} offer stronger trajectory reasoning, but their computational burden and communication assumptions become central when scaling toward hundreds or thousands of interacting aerial agents.
+
+Safety filters and control barrier functions provide a formal route to safety-critical control \cite{ames2017cbf}. Related multirobot safety-barrier and reciprocal-collision-avoidance work shows how nominal controls can be minimally modified to enforce pairwise safety constraints in decentralized systems \cite{wang2017safety,bareiss2015generalized}. Such optimization- or reciprocal-velocity-based methods are important reference points, but their solver structure, reciprocal motion assumptions, and horizon choices make a full-factorial 1000-agent, obstacle-rich, communication-degraded comparison a distinct study. The present paper does not claim a continuous-time formal safety proof. Instead, it uses an engineering safety filter at the simulation time step: nominal accelerations are modified by a local shield and by a command-level obstacle filter before the bounded double-integrator update. This design choice reflects the paper's simulation goal: to test whether a transparent, scalable architecture can reduce collision/contact failures and expose bottlenecks under degraded nominal communication, a modeled local relative-state safety abstraction, and dense obstacles.
+
+CASSA should therefore be read as complementary to formal CBF, reciprocal-velocity, and trajectory-optimization methods rather than as a replacement for them. The present paper does not introduce a new continuous-time safety theorem. Instead, it studies how a transparent combination of existing control motifs behaves when embedded in a large-scale aerial-swarm simulator with degraded nominal communication, explicit information-stream boundaries, and reported correction telemetry.
+
+\section{Method}
+
+\subsection{Modeling scope and information streams}
+
+\textbf{Assumption 1: idealized local relative-state safety interface for factor-isolated evaluation.} The main experiments assume that each agent has access to a short-range all-around relative-state stream for nearby agents inside the safety influence radius. This stream is sampled at 4 Hz and is used only by the local safety shield and speed governors. In the main sweep, local-safety dropout, estimator delay, relative-state noise, field-of-view limits, occlusion, missed detections, and sensor saturation are not modeled. This is a deliberate interface assumption for separating close-range safety response from nominal communication degradation, not a claim that a particular lidar, vision, UWB, or multi-sensor perception stack has been validated. The local relative-state stream is therefore analogous to providing a state-estimation interface to the controller rather than modeling any particular onboard sensing pipeline.
+
+\textbf{Definition: nominal-communication robustness.} In this paper, nominal-communication robustness refers to preservation of the reported simulator-level collision/contact and completion metrics when the nominal neighbor-coordination stream is degraded by packet loss, latency, finite communication radius, neighbor caps, and communicated-state noise. It does not imply robustness to degradation of the separate short-range local relative-state safety stream. Table \ref{tab:information-streams} summarizes the three information streams used in the experiments and the claim boundary associated with each stream.
+
+\input{tables/table_0_information_streams.tex}
+
+\subsection{Architecture overview}
+
+CASSA is organized as a five-stage decentralized pipeline. This overview is provided to make the architecture-level contribution explicit: degraded communication is used for scalable nominal coordination, while close-range safety is handled by the separate local relative-state stream, conservative speed governors, and an acceleration-bounded obstacle filter that acts before state integration.
+
+The novelty claimed in this paper is architectural rather than term-level. The individual ingredients--flocking-style nominal motion, local repulsion, speed reduction under congestion, and obstacle braking--are related to existing families of decentralized control and safety-filter methods. CASSA's contribution is to organize these ingredients into a separated information model and an auditable large-swarm control stack: degraded communication affects nominal coordination, whereas the close-range safety response is evaluated through a modeled local relative-state interface. The evaluation therefore tests whether this architecture preserves simulator-level collision/contact safety and progress at large scale, not whether any single force term is independently novel.
+
+\begin{itemize}
+    \item \textbf{Communication-aware nominal coordination:} each agent computes goal, flocking, obstacle, boundary, and damping accelerations from delayed, lossy, and neighbor-limited communication observations; delayed neighbor states are predicted forward when prediction is enabled.
+    \item \textbf{Local safety shielding:} short-range relative-state observations, independent of the communication packet-loss model, modify the nominal acceleration using distance and closing-speed penalties for nearby agents.
+    \item \textbf{Crossing-flow pairwise speed governor:} nearby closing pairs from different crossing-flow groups receive a pre-integration target-speed reduction that limits residual pairwise closing velocity before bounded integration.
+    \item \textbf{Density-aware speed regulation:} target speeds are reduced in dense neighborhoods to preserve progress while reducing risky approach velocities in congested flow.
+    \item \textbf{Command-level obstacle filter:} obstacle-directed acceleration is filtered before integration using a braking-distance constraint around cylindrical clearance envelopes, with the retained projection fallback reported as runtime telemetry.
+\end{itemize}
+
+Thus, the central controller idea is not any single force term; it is the separation of delayed communication-based coordination from the modeled local relative-state safety response, conservative pre-integration speed governors, and an obstacle-clearance filter whose bounded acceleration commands are accompanied by explicit correction telemetry when the retained projection fallback is invoked.
+
+\subsection{Agent model}
+
+Each aerial robot is modeled as a bounded double integrator in three dimensions:
+\begin{align}
+    \dot{\mathbf{p}}_i &= \mathbf{v}_i,\\
+    \dot{\mathbf{v}}_i &= \mathbf{u}_i,
+\end{align}
+where $\mathbf{p}_i \in \mathbb{R}^3$ is position, $\mathbf{v}_i \in \mathbb{R}^3$ is velocity, and $\mathbf{u}_i \in \mathbb{R}^3$ is commanded acceleration. The simulator limits speed and acceleration to small-aerial-robot values. The evaluation separates safety from mission completion. Safety success requires zero inter-agent collision pairs and zero obstacle contacts over a run. Mission completion is reported as time-to-threshold: T90, T95, and T99 denote the first times at which at least 90\%, 95\%, and 99\% of agents, respectively, have reached their terminal goal tolerance. If a run does not reach a threshold before its configured horizon, that threshold is reported as horizon-censored. If a single operational pass/fail criterion is required, it is the conjunction of safety success and reaching the selected completion threshold within the available mission time.
+
+\subsection{Communication-aware nominal controller}
+
+The nominal controller combines local separation, alignment, cohesion, goal seeking, obstacle repulsion, boundary repulsion, and damping. Let $\mathcal{N}^{\mathrm{comm}}_i$ be the communicated-neighbor set after range limiting, the 12-neighbor cap, latency, packet loss, and noise, and let $n_i^{\mathrm{comm}}$ denote the number of communicated neighbors. For a communicated neighbor $j$, define $d_{ij}=\|\mathbf{p}_i-\hat{\mathbf{p}}_j\|$ and $\mathbf{n}_{ij}=(\mathbf{p}_i-\hat{\mathbf{p}}_j)/(d_{ij}+\epsilon)$. The three flocking terms are
+\begin{align}
+    \mathbf{s}_i &=
+    \sum_{j\in\mathcal{N}^{\mathrm{comm}}_i}
+    \frac{\max(0,r_{\mathrm{inf}}-d_{ij})}{d_{ij}+0.05}\mathbf{n}_{ij},\\
+    \mathbf{a}_i &=
+    \frac{1}{n_i^{\mathrm{comm}}}
+    \sum_{j\in\mathcal{N}^{\mathrm{comm}}_i}\hat{\mathbf{v}}_j-\mathbf{v}_i,\qquad
+    \mathbf{c}_i =
+    \frac{1}{n_i^{\mathrm{comm}}}
+    \sum_{j\in\mathcal{N}^{\mathrm{comm}}_i}\hat{\mathbf{p}}_j-\mathbf{p}_i ,
+\end{align}
+with zero alignment and cohesion when no communicated neighbor is available. The goal term is a velocity-tracking acceleration $\mathbf{g}_i=\mathbf{v}^{g}_i-\mathbf{v}_i$, where $\mathbf{v}^{g}_i$ points toward the current control goal with speed $\min(v^{\mathrm{tar}}_i,0.7\|\mathbf{g}^{\mathrm{pos}}_i-\mathbf{p}_i\|)$. For a cylindrical obstacle, the horizontal obstacle term is activated when the signed horizontal distance $q_{io}=d_{io}^{xy}-r_o$ is below the obstacle influence distance $\rho_o=1.2+m_{\mathrm{obs}}$:
+\begin{align}
+    \mathbf{o}^{xy}_i &\mathrel{+}=
+    \eta_{io}\mathbf{n}^{o}_{i},\qquad q_{io}<\rho_o,\\
+    \eta_{io} &= k_{io}/h_{io},\\
+    h_{io} &= \max(q_{io}+0.08,0.08) .
+\end{align}
+Here, $k_{io}$ is the squared normalized clearance deficit used by the implementation. The vertical obstacle term is only a mild height-separation bias inside the obstacle height interval. The boundary term applies a linear repulsion within 0.55 m of each arena face plus a small velocity damping component. The resulting nominal command is
+\begin{align}
+    \mathbf{u}^{\mathrm{nom}}_i =
+    w_s \mathbf{s}_i + w_a \mathbf{a}_i + w_c \mathbf{c}_i +
+    w_g \mathbf{g}_i + w_o \mathbf{o}_i + w_b \mathbf{b}_i -
+    w_d \mathbf{v}_i .
+\end{align}
+Neighbor terms are computed from the most recent communication observations. Communication observations are subject to finite radius, a fixed maximum neighbor count, latency, packet loss, and state noise. When prediction is enabled, delayed neighbor positions are propagated forward using delayed velocities:
+\begin{align}
+    \hat{\mathbf{p}}_j(t) =
+    \mathbf{p}_j(t-\tau) + \mathbf{v}_j(t-\tau)\tau .
+\end{align}
+This prediction is used for nominal coordination, while safety-critical close-range avoidance uses a separate local observation model.
+
+\subsection{Local safety shield}
+
+The safety shield implements the local relative-state safety abstraction in Assumption 1. Communication dropout affects the delayed neighbor stream used by the nominal controller, whereas the main 255-run sweep holds the close-range relative-state stream used by the shield and speed governors idealized apart from 4 Hz sampling and the finite safety influence radius. For each agent, neighboring agents within that radius are used to compute distance and closing-speed penalties:
+\begin{align}
+    \Delta \mathbf{u}_i =
+    \gamma \sum_{j \in \mathcal{N}^{\mathrm{safe}}_i}
+    \left[
+    w_{\mathrm{safe}}
+    \frac{\max(0,r_{\mathrm{inf}} - d_{ij})}{r_{\mathrm{inf}} - r_{\mathrm{safe}}}
+    +
+    w_{\mathrm{close}} \max(0,-\mathbf{v}_{ij}^{T}\mathbf{n}_{ij})
+    \right]\mathbf{n}_{ij},
+\end{align}
+where $d_{ij}=\|\mathbf{p}_i-\mathbf{p}_j\|$, $\mathbf{n}_{ij}=(\mathbf{p}_i-\mathbf{p}_j)/d_{ij}$, $\mathbf{v}_{ij}=\mathbf{v}_i-\mathbf{v}_j$, and $\gamma$ is a density-dependent safety gain. The commanded acceleration is then
+\begin{align}
+    \mathbf{u}_i = \mathrm{sat}_{u_{\max}}\left(\mathbf{u}^{\mathrm{nom}}_i + \Delta \mathbf{u}_i\right).
+\end{align}
+
+CASSA also applies target-speed governors before integration. The density-aware governor computes a target-speed factor
+\begin{align}
+    v^{\mathrm{tar}}_i &= v_{\max} f_i,\\
+    f_i &=
+    \max(f_{\min},\min(1,f_{\mathrm{near}},f_{\mathrm{dense}},f_{\mathrm{close}},f_{\mathrm{obs}},f_{\mathrm{time}})).
+\end{align}
+The factors are evaluated from the local-safety neighbor set. In the implemented parameterization, $f_{\mathrm{near}}$ is reduced to 0.35 when the nearest neighbor is within $r_{\mathrm{safe}}+0.03$ m and to 0.60 within $r_{\mathrm{safe}}+0.12$ m; $f_{\mathrm{dense}}$ is reduced to 0.82 when at least eight neighbors lie inside the safety influence radius and to 0.72 for at least 16 neighbors; $f_{\mathrm{close}}$ is reduced to 0.65 when the maximum closing speed exceeds 0.55 m/s within $r_{\mathrm{safe}}+0.20$ m. The obstacle factor is reduced when the next-step radial obstacle clearance approaches the conservative obstacle envelope. The time factor is only a terminal progress relaxation: if an agent is well separated, not closing rapidly, and close to its assigned goal, the speed floor is raised to avoid unnecessarily delaying the T90/T95/T99 thresholds.
+
+A crossing-flow pairwise speed governor further reduces target speed for nearby closing pairs from different crossing-flow groups within a 1.20 m influence radius, using a 0.42 m clearance scale and a 0.03 m/s closing-speed trigger. Flow groups are computed from the start-to-goal displacement, not from hand-entered semantic labels: agents whose absolute start-to-goal displacement is larger along the y axis than along the x axis are treated as the transverse flow, and the remaining agents are treated as the through-flow. In the crossing-traffic scenario only, mixed-flow pairs use asymmetric floors of 0.82 for the through-flow and 0.28 for the transverse flow. If a scenario has no mixed dominant axes, or if the scenario is not the crossing-traffic case, this asymmetric priority rule is disabled and the controller relies on the local safety shield and density-aware speed regulation. Thus the current implementation uses a transparent start-goal-geometry rule for the crossing benchmark, not a learned or perception-derived traffic-priority classifier.
+
+\subsection{Command-level obstacle filter}
+
+Obstacle clearance is handled before state integration by a command-level braking filter. For each cylindrical obstacle, the controller defines a conservative radial clearance
+\begin{align}
+    r^{\mathrm{obs}}_{\mathrm{clr}} =
+    r_{\mathrm{obs}} + r_{\mathrm{coll}} + \epsilon_{\mathrm{obs}} + m_{\mathrm{obs}},
+\end{align}
+where $r_{\mathrm{obs}}$ is the obstacle radius, $r_{\mathrm{coll}}=0.12$ m is the collision radius, $\epsilon_{\mathrm{obs}}=0.02$ m is a discrete-time clearance allowance, and $m_{\mathrm{obs}}=0.34$ m is the obstacle-clearance margin. If an agent is inside the obstacle height range and within a lookahead band of the radial clearance envelope, the filter checks the radial velocity and acceleration along the outward obstacle normal $\mathbf{n}_o$. Let $d_o$ be the horizontal distance from the obstacle center, $v_r=\mathbf{n}_o^T \mathbf{v}_{xy}$, and $a_r=\mathbf{n}_o^T \mathbf{u}_{xy}$. The allowed inward speed is limited by the remaining braking distance:
+\begin{align}
+    v^{\mathrm{in}}_{\max} =
+    \sqrt{2 u_{\max}\max(d_o-r^{\mathrm{obs}}_{\mathrm{clr}}-b_o,0)},
+\end{align}
+with buffer $b_o=0.15$ m. The command is adjusted so that the next-step radial speed satisfies
+\begin{align}
+    v_r + a_r \Delta t \geq -v^{\mathrm{in}}_{\max},
+\end{align}
+and it is saturated by the same $u_{\max}=3.0$ m/s$^2$ acceleration limit as the nominal controller. The filter is activated inside a $0.90$ m lookahead margin around the clearance envelope. This is larger than the full-speed stopping distance $v_{\max}^2/(2u_{\max})=0.375$ m at $v_{\max}=1.5$ m/s, leaving space for the 0.15 m buffer, the 0.34 m obstacle-clearance margin, and discrete-time response. The 0.02 m allowance is a conservative finite-step clearance allowance used in the diagnostic envelope. The filter is therefore an acceleration-bounded one-step braking condition under the double-integrator model, not a continuous-time formal barrier proof.
+
+Algorithm 1 summarizes the command-level obstacle braking filter.
+\begin{itemize}
+    \item \textbf{Input:} current position $\mathbf{p}_i$, velocity $\mathbf{v}_i$, nominal acceleration $\mathbf{u}^{\mathrm{nom}}_i$, cylindrical obstacles, $\Delta t=0.05$ s, $u_{\max}=3.0$ m/s$^2$, lookahead 0.90 m, buffer 0.15 m, margin 0.34 m, and allowance 0.02 m.
+    \item \textbf{Step 1:} saturate the nominal acceleration to the global acceleration bound.
+    \item \textbf{Step 2:} for each obstacle whose height interval contains the agent, compute the horizontal outward normal, radial distance, radial speed, and radial acceleration.
+    \item \textbf{Step 3:} skip the obstacle if the agent is outside the 0.90 m lookahead band around $r^{\mathrm{obs}}_{\mathrm{clr}}$.
+    \item \textbf{Step 4:} compute $v^{\mathrm{in}}_{\max}$ from the remaining buffered braking distance and require $v_r+a_r\Delta t\geq -v^{\mathrm{in}}_{\max}$.
+    \item \textbf{Step 5:} if the next-step radial speed would be too negative, add only the missing outward radial acceleration component.
+    \item \textbf{Output:} re-saturate the final acceleration by $u_{\max}$ and pass it to the bounded double-integrator update.
+\end{itemize}
+This produces an acceleration-bounded obstacle response before any retained state-space correction is applied. If several obstacle or pairwise constraints compete after final acceleration saturation, the implementation does not claim a formal discrete-time invariance proof; instead, the simulator records diagnostic clearance-violation telemetry after integration and reports every retained projection fallback adjustment. Under the 4 Hz information-stream setting reported below, the final CASSA full sweep has 3,571 obstacle-projection agent adjustments and 18 pairwise-projection agent adjustments, zero post-integration/pre-projection obstacle contacts, and 3,571 conservative pre-projection clearance-violation steps. These diagnostics are reported explicitly so that the simulator-level safety result is not mistaken for a projection-free formal continuous-time invariance proof.
+
+\section{Simulation setup}
+
+\subsection{Scenarios}
+
+Four scenarios are used. The open-flock scenario tests basic scalable goal-directed motion. The obstacle corridor contains 21 cylindrical obstacles arranged in three lateral rows and is the main dense navigation stress test. The crossing-traffic scenario sends two sub-swarms through a congested intersection. The merge--split scenario tests three groups that cross through a shared central gate before splitting toward separate exits, creating transient pairwise conflicts and bottleneck congestion before the groups separate. High-density stress tests include up to 1000 agents in the obstacle corridor.
+
+Reserved seed-99 trajectory samples are used only for Figure \ref{fig:sample-trajectories}; they are excluded from all aggregate safety, completion-time, projection-telemetry, and Crazyflow replay statistics.
+
+The primary CASSA aggregate contains 255 runs after excluding the reserved trajectory sample. All aggregate rows use seeds 0--4. Scenario coverage is 125 obstacle-corridor runs, 90 crossing-traffic runs, 20 merge--split runs, and 20 open-flock runs. By scale, the sweep contains 20 runs at 50 agents, 90 at 100 agents, 90 at 200 agents, 35 at 500 agents, and 20 at 1000 agents. Communication conditions cover packet-loss probabilities 0, 0.1, 0.2, and 0.4 and latencies 0, 50, 100, and 200 ms through scaling, packet-loss, latency, and high-density stress blocks. The reported main full sweep samples nominal communication, the local relative-state safety stream, and obstacle information at 4 Hz while retaining the 0.05 s integration step. This 4 Hz update frequency is intentionally low-rate rather than a high-rate oracle: it remains above PX4's documented offboard-setpoint liveness threshold while reflecting scalability limits in UWB-style inter-robot ranging/localization systems \cite{px4offboard2026,shalaby2024passiveuwb}. However, the 4 Hz setting should not be interpreted as a complete field perception model because the main local-safety stream does not include dropout, estimator delay, field-of-view limits, occlusion, range-dependent missed detections, or sensor saturation. Thus, the packet-loss and latency sweeps degrade the nominal communication stream, not the close-range safety-observation stream; the resulting safety rates should be interpreted under the sensing abstraction in Table \ref{tab:information-streams}.
+
+\subsection{Controllers and communication conditions}
+
+Table \ref{tab:parameter-summary} condenses the experimental settings needed to interpret the reported simulations. It lists only the compact values needed for the result tables; the surrounding method sections define how the local relative-state safety stream, obstacle filter, and projection telemetry are used.
+
+\input{tables/table_5_parameter_summary.tex}
+
+The matched controller set includes boids, artificial potential fields (APF), a short-horizon predictive surrogate \cite{mun2026collision,dunbar2006distributed}, a MADER-inspired surrogate \cite{tordesillas2022mader}, a CBF-QP row solved by the open-source OSQP quadratic-program solver \cite{ames2017cbf,wang2017safety,stellato2020osqp}, an RVO2 row that calls the open-source C++ reciprocal-velocity library through a thin wrapper \cite{bareiss2015generalized,vandenberg2008rvo,snape2016rvo2}, CASSA without safety shield, and the complete CASSA controller. This controller set is intended to compare scalable reactive, optimization-inspired, external-code, and mechanism-ablation controllers under identical large-swarm sweeps. Communication degradation includes packet loss probabilities of 0, 0.1, 0.2, and 0.4, and latency values of 0, 50, 100, and 200 ms in the configured robustness blocks. Neighbor observations are limited by communication radius and maximum neighbor count. CASSA uses the same nominal communication model as the ablations, plus the modeled local relative-state safety stream, target-speed governors, the command-level obstacle filter, and the reported projection fallback. Controller gains and perturbation details are stated in the relevant method and audit descriptions.
+
+Baseline fairness is enforced at the simulator-interface level: every controller row receives the same goal set, initial conditions, obstacle map, arena bounds, 4 Hz communication and obstacle-information updates, 0.05 s integration step, 1.5 m/s speed limit, 3.0 m/s$^2$ acceleration limit, 4.0 m communication radius, 12-neighbor cap, packet-loss/latency/noise model, seeds, and 120 s horizon. Completed agents remain part of the same traffic model for all controller rows. In that main table, baseline rows retain their native sensing and safety structure and are not given CASSA's local relative-state safety stream, crossing-flow speed governor, density-aware target-speed regulator, or command-level obstacle filter. Therefore, Table \ref{tab:controller-comparison} is an integrated full-stack architecture comparison and failure-mode audit, not proof that CASSA's nominal coordination law alone dominates every baseline nominal controller. Because CASSA receives the modeled local relative-state safety interface while the baseline rows retain their native sensing and safety structures, the comparison should be interpreted as a full-stack simulator-interface comparison under the declared information model. It should not be interpreted as evidence that CASSA's nominal communication policy alone is more robust to all sensing and communication failures.
+
+The short-horizon predictive surrogate and MADER-inspired surrogate rows share the same double-integrator state update, speed and acceleration saturation, communicated-neighbor stream, obstacle geometry, and 120 s horizon as CASSA. The short-horizon predictive surrogate combines goal tracking with closest-approach pairwise and obstacle penalties over a short horizon. The MADER-inspired surrogate uses the same predictive structure with longer pairwise and obstacle lookahead, larger clearance margins, and lower goal aggressiveness to mimic conservative multiagent trajectory planning. These two rows should therefore be interpreted as scalable simulator surrogates under matched base sensing and actuation limits, not as drop-in reference implementations or performance measurements of the cited MPC or MADER packages. The package-based CBF-QP and RVO2 rows use external solver/library code for the active optimization or reciprocal-velocity step. The OSQP row starts from the common goal/obstacle/boundary nominal acceleration and solves a three-dimensional acceleration-projection CBF-QP with active pairwise, cylindrical-obstacle, and boundary half-space constraints through \texttt{osqp.OSQP()}; if OSQP does not return a solved status, the implementation falls back to the same half-space projection routine but does not currently persist per-step solver-status counts. The RVO2 row sends the current horizontal positions, horizontal velocities, and preferred velocities to the RVO2 C++ simulator at each control step; altitude, cylindrical-obstacle, and boundary terms remain supplied by the common simulator interface because RVO2 is a two-dimensional reciprocal-velocity library. RVO2 and CBF-QP failure modes are therefore interpreted through realized collision/contact metrics, runtime, and trajectory behavior in this simulator interface rather than as definitive limitations of their original full algorithms.
+
+\subsection{Metrics}
+
+The primary reported metrics are safety success and time-to-threshold mission completion. Supporting metrics include final reached fraction, cumulative inter-agent collision pairs, obstacle contacts, minimum inter-agent distance, safety-violation rate, acceleration-squared energy proxy, mean messages per agent per update, runtime per agent-step, and completion time. Safety success uses the collision/contact criterion: the inter-agent collision radius is 0.12 m, whereas the 0.39 m safe radius is used as a conservative local-safety influence scale rather than as the binary success threshold. Therefore, a minimum distance above the collision radius but below the safe radius is collision-free under the reported metric, but it should not be interpreted as strict safe-radius clearance preservation. Obstacle contacts are counted as cumulative agent-time-step samples inside an obstacle clearance region, not as unique contact episodes. The nominal-communication robustness interpretation of these metrics is conditional on the information-stream boundary in Table \ref{tab:information-streams}: the nominal communication stream is stress-tested, while the local relative-state safety stream remains available as modeled. Command-filter telemetry records conservative obstacle-clearance violation steps, post-integration/pre-projection collision/contact counts, and any post-integration projection adjustment counts retained by the simulator. In the final 4 Hz CASSA sweep, the projection fallback is enabled and all obstacle/pairwise projection adjustments are reported directly rather than treated as hidden correction.
+
+\subsection{Result tiers}
+
+The manuscript integrates four result tiers. The first tier is the matched simulator-interface comparison, which evaluates reactive baselines, predictive surrogate families, external-package baseline rows, and CASSA under the same 120 s horizon, seeds, scenarios, obstacle geometry, collision/contact definitions, and nominal communication settings. This tier supports the main claims about simulator-level safety success, scalability, packet loss, latency, and scenario dependence at the level of complete controller stacks, conditioned on the modeled local relative-state safety abstraction. The second tier is scenario and nominal-communication response analysis of the final CASSA sweep. The third tier is command-level filter telemetry, which reports pre-projection clearance telemetry and retained projection fallback adjustments in the 4 Hz full sweep. The fourth tier is an available full-sweep Crazyflow dynamics-consistency experiment for a CASSA reference set, which tracks references under rotor-drag dynamics and downwash without path correction. This tier is not a comparative physics replay of the baseline controllers.
+
+\section{Evaluation results}
+
+\subsection{Reading order of the result package}
+
+The results are organized from broad performance to mechanism-level evidence. Unless otherwise stated, all CASSA results in this section are conditioned on the idealized local relative-state safety interface in Table \ref{tab:information-streams}. Throughout this section, ``communication degradation'' refers only to degradation of the nominal neighbor-coordination stream. The local relative-state safety stream is not degraded in these experiments. Therefore, the zero-collision/contact results should not be read as evidence that CASSA would remain safe under local sensing dropout, estimator delay, occlusion, or missed detections. Sections below first compare CASSA with baselines across the matched full sweep, then break down CASSA behavior by scenario and nominal communication degradation, then report command-level obstacle-filter telemetry. A Crazyflow full-sweep replay is included as a dynamics-consistency experiment for the CASSA reference family; baseline comparisons remain defined in the matched double-integrator sweep because the replay is not repeated for every baseline controller.
+
+\subsection{Overall performance}
+
+Table \ref{tab:controller-comparison} summarizes safety success and time-to-completion thresholds for the matched 120 s simulator-interface sweep. Each controller has 255 runs under the same scenarios, seeds, obstacle geometry, collision/contact definitions, 4 Hz nominal update-rate setting, and communication conditions. CASSA additionally uses the modeled local relative-state safety stream, target-speed governors, command-level obstacle filter, and reported projection fallback; CBF-QP and RVO2 use external open-source solver/library code through the same simulator interface. The table should therefore be read as a simulator-interface full-stack comparison and failure-mode audit, not as a definitive ranking of the original baseline algorithms. T cells report horizon-censored median seconds, with parentheses giving the number of threshold-reaching runs. Obstacle contacts are cumulative agent-time-step samples inside the obstacle clearance region, not unique contact episodes. Under the idealized local relative-state safety interface and retained projection fallback, CASSA achieved 255/255 simulator-level safety successes, zero inter-agent collision pairs, and zero obstacle contacts. It also reached T90, T95, and T99 in all 255 runs, with median threshold times of 59.9, 61.9, and 66.0 s. The exact two-sided 95\% Clopper--Pearson interval for the observed 255/255 safety-success rate is approximately 0.986--1.000, so the result should be read as complete collision/contact elimination in the tested simulator sweep, not as a continuous-time or hardware safety proof.
+
+The matched baseline results show why safety and completion should be reported separately. The short-horizon predictive surrogate and MADER-inspired surrogate reduce some failure modes but still show lower safety success, inter-agent collisions, or severe T99 censoring. CBF-QP solved through OSQP reaches T99 in all 255 runs but records many pairwise and obstacle failures, while the RVO2 package row preserves zero inter-agent collision pairs but has large obstacle-contact totals and incomplete T99 reachability. CASSA achieves the strongest full-stack simulator-interface result among the evaluated controller rows in Table \ref{tab:controller-comparison}, with zero inter-agent collisions and the lowest obstacle-contact total among controllers that reach T99 in every run. The no-shield row should be interpreted only as a limited mechanism check showing that the local pairwise safety response is necessary within this implementation. It is not a complete component-attribution study of all CASSA modules. In particular, the present manuscript does not attempt to isolate the independent marginal contribution of the density governor, crossing-flow governor, obstacle filter, prediction term, or projection fallback.
+
+\input{tables/table_1_controller_comparison.tex}
+
+Figure \ref{fig:time-scalability} shows T90, T95, and T99 versus swarm size in the obstacle corridor, the most difficult scenario selected by the plotting pipeline. CASSA reaches the completion thresholds at all plotted swarm sizes, while the longer threshold times expose the additional mission time needed in 500- and 1000-agent corridor stress cases. Under the 4 Hz setting, this same scenario accounts for most projection-fallback and pre-projection clearance-violation telemetry but no final obstacle-contact failures. The configured simulation horizon is omitted from the time-threshold figures because its value is much larger than the plotted median threshold times and would compress the visible differences among T90, T95, and T99; horizon censoring and completion status are instead reported in the accompanying tables and text.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.86\linewidth]{fig_1_time_scalability.pdf}
+    \caption{T90/T95/T99 time-to-threshold scalability of CASSA (Proposed) in the representative obstacle-corridor scenario. Lines show medians and shaded bands show interquartile ranges across runs at each swarm size.}
+    \label{fig:time-scalability}
+\end{figure}
+
+\subsection{Scenario-wise CASSA (Proposed) performance}
+
+Table \ref{tab:proposed-scenarios} breaks down CASSA by scenario. Under the modeled local relative-state abstraction, all four scenarios achieve 1.00 simulator-level safety success, with zero inter-agent collisions and zero obstacle contacts in the final full sweep. As in Table \ref{tab:controller-comparison}, T cells report horizon-censored median seconds with threshold-reaching run counts. All scenarios reach T99 in every run. The obstacle corridor remains the hardest throughput condition, with T90=68.8 s, T95=71.5 s, and T99=76.5 s, and it contains most projection-fallback and conservative pre-projection clearance-violation steps. Crossing traffic reaches T99 at 58.2 s, while merge--split and open flock reach T99 at 60.6 s and 53.7 s, respectively. Thus, CASSA maintains mission completion and collision/contact-free simulator safety in the modeled 4 Hz communication and obstacle-information environment, while the telemetry still identifies dense obstacle corridors as the primary margin bottleneck.
+
+\input{tables/table_2_proposed_by_scenario.tex}
+
+Figure \ref{fig:runtime} reports runtime scaling for the same controller families summarized in Table \ref{tab:controller-comparison}, combining the matched reactive and CASSA-ablation rows with the predictive-surrogate and external-package baseline sweeps under the nominal no-loss/no-latency obstacle-corridor condition. CASSA is more expensive than the simplest baselines because it computes local safety neighbors, speed governors, and obstacle-filter checks, but the measured runtime remains below the millisecond-per-agent-step scale in the largest 1000-agent CASSA cases. All plotted controller families include 1000-agent points in this comparison.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.86\linewidth]{fig_2_runtime_scaling.pdf}
+    \caption{Runtime scaling comparison measured as milliseconds per agent-step. Lines show means and shaded bands show 95\% confidence intervals where replicate data are available.}
+    \label{fig:runtime}
+\end{figure}
+
+\subsection{Nominal communication packet loss and latency}
+
+Figures \ref{fig:packet-time} and \ref{fig:latency-time} summarize time-to-threshold response to packet loss and latency in the nominal communication stream. Under the modeled local relative-state abstraction, CASSA maintains zero inter-agent collision pairs and zero obstacle contacts while the nominal communication stream is degraded because the nominal controller can use delayed predicted neighbors, the safety shield uses the separate close-range relative-state stream, and the command-level obstacle filter handles modeled static-obstacle clearance. These results show nominal-communication robustness in the defined sense: the tested scenarios remain insensitive to degradation of the nominal communication stream, provided that the short-range local relative-state safety stream remains available as modeled. Threshold times increase primarily in the densest obstacle-corridor cases, where clearance and completed-agent traffic assumptions make terminal flow more conservative. Figure \ref{fig:sample-trajectories} complements the aggregate metrics by showing representative CASSA trajectories for obstacle-corridor, crossing-traffic, and merge--split scenarios, making the obstacle bottleneck, perpendicular flow interaction, and shared-gate merge/split congestion visually explicit.
+
+Figure \ref{fig:packet-time} should be interpreted as a packet-loss sweep under an already degraded communication condition: every solid-line point uses fixed 50 ms latency. Thus, the zero-loss point in that sweep is not the nominal no-loss/no-latency baseline. The dashed horizontal lines show the corresponding nominal medians for the same representative N=200 corridor condition. In this 4 Hz sweep, the nominal T99 is approximately 66.3 s, whereas the fixed-50 ms latency sweep remains near 75.5--77.0 s across packet-loss levels. Packet loss reduces the number of communicated neighbors, but the controller still uses the modeled local relative-state safety stream and the command-level obstacle filter; therefore, the observed packet-loss effect on completion time is smaller than seed-to-seed terminal-flow variation and the dominant bottleneck is the dense obstacle-flow interaction.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.86\linewidth]{fig_3_packet_loss_time.pdf}
+    \caption{Packet-loss response of CASSA (Proposed) at fixed 50 ms latency in the representative N=200 obstacle-corridor scenario. Packet loss is applied to the nominal communication stream only; the local relative-state safety stream remains available under Assumption 1.}
+    \label{fig:packet-time}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.86\linewidth]{fig_4_latency_time.pdf}
+    \caption{T90/T95/T99 time-to-threshold under nominal-communication latency in the representative obstacle-corridor scenario. Latency is applied to the nominal communication stream only; local relative-state safety observations follow the idealized interface in Assumption 1.}
+    \label{fig:latency-time}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.96\linewidth]{fig_5_sample_trajectories.pdf}
+    \caption{Representative CASSA (Proposed) trajectories for obstacle-corridor, crossing-traffic, and merge--split scenarios. Each row shows a three-dimensional view and a top-down view of a 100-agent sample.}
+    \label{fig:sample-trajectories}
+\end{figure}
+
+\subsection{Command-level clearance-filter telemetry}
+
+Table \ref{tab:projection-audit} reports command-filter telemetry for the final 4 Hz CASSA full sweep under the same information-stream assumptions. Projection adjustments count retained post-integration state-space correction agent adjustments; pre-projection obstacle contacts and clearance-violation steps expose finite-step margin loss before the retained projection routine. Across 255 primary CASSA runs, the retained projection fallback records 3,571 obstacle-projection agent adjustments and 18 pairwise-projection agent adjustments, while the table records zero post-integration/pre-projection obstacle-contact samples. Conservative clearance-violation telemetry totals 3,571 agent steps, concentrated in the obstacle corridor with a smaller contribution from crossing traffic and none in merge--split or open flock. This result is important because it separates the reported simulator safety metric from margin diagnostics: the 4 Hz full sweep is collision/contact-free under the modeled streams, but the acceleration-bounded implementation plus projection fallback is not claimed as a formal discrete-time obstacle-clearance invariance proof.
+
+\input{tables/table_6_projection_audit.tex}
+
+\subsection{Crazyflow replay}
+
+To provide higher-fidelity dynamics-consistency evidence, a full set of 255 CASSA reference trajectories was replayed in Crazyflow \cite{schuck2026crazyflow} with rotor-drag dynamics, downwash enabled, and no additional trajectory correction during replay. The Crazyflow reference generator uses the same separated 4 Hz information model as the primary sweep, but applies a dynamics-aware obstacle setting for replay trackability: a 0.34 m obstacle-clearance margin, a 0.15 m command-filter buffer, a 0.90 m lookahead margin, and obstacle projection during reference generation. This replay is a dynamics-consistency check for a CASSA reference set generated by the same controller family, not a replacement for the main 4 Hz simulator-interface sweep, not a perception-robustness test, and not a comparative physical validation of every baseline controller. The replay set covers the same scenario families, density range, seed count, and communication-degradation categories, including obstacle-constrained motion, crossing traffic, communication degradation, and swarms up to 1000 agents. Figure \ref{fig:crazyflow-drone-model} summarizes the Crazyflie 2.1+ model used for this replay. The product photograph and public platform specifications identify the real Crazyflie 2.1+ nano-quadrotor \cite{bitcraze2026crazyflie21plus}, while the numerical replay uses Crazyflow's default \texttt{cf2x\_L250} Crazyflie 2.1-class parameterization with the \texttt{so\_rpy\_rotor\_drag} physics model. The primary double-integrator sweep uses a 0.027 kg mass label for platform scale, but its acceleration-bounded state update and acceleration-squared energy proxy do not integrate force through mass. Crazyflow uses its own 31.9 g parameterization for the rotor-drag replay; the replay is therefore a trackability and collision/contact consistency check under the Crazyflow model and stated information abstraction, not a mass-matched force or energy validation of the primary simulator.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.96\linewidth]{fig_6_crazyflie_model.pdf}
+    \caption{Crazyflie 2.1+ platform and Crazyflow \texttt{cf2x\_L250} replay parameters.}
+    \label{fig:crazyflow-drone-model}
+\end{figure}
+
+Table \ref{tab:crazyflow-replay} shows that the dynamics-aware reference set preserved collision/contact-free tracking in the Crazyflow replay. The replay references were generated at 4 Hz with a 0.34 m obstacle margin, a 0.15 m command-filter buffer, a 0.90 m lookahead, and obstacle projection; rotor-drag dynamics and downwash were enabled only during replay. The overall Crazyflow safety-success rate was 1.000, corresponding to 255/255 successful runs, with zero inter-agent collision-pair samples and zero obstacle contacts. All runs reached T99 within the replay horizon; the overall median T99 was 66.0 s and the maximum T99 was 104.0 s. The maximum tracking error was 0.217 m and the maximum downwash force was 0.083 N. This result should be read as collision/contact safety under the reported replay metric and information abstraction, not as strict safe-radius clearance preservation or local-perception robustness. By scale, the N=50, N=100, N=200, N=500, and N=1000 groups all had safety-success rates of 1.00. The slowest replay conditions remained the dense obstacle-corridor cases, with N=500 and N=1000 median T99 values of 84.0 s and 101.6 s, respectively.
+
+\input{tables/table_9_crazyflow_replay.tex}
+
+\section{Limitations}
+
+The study is simulation-based, and the scope boundaries in Table \ref{tab:information-streams} are part of the interpretation of the results rather than post hoc caveats. The main aerial-robot model is a bounded double integrator and therefore abstracts attitude dynamics, actuator allocation, motor saturation, aerodynamic interactions, onboard perception artifacts, and real localization failures. The command-level obstacle filter respects the acceleration bound used by the simulator, but the final 4 Hz full sweep retains and reports a projection fallback; the remaining pre-projection clearance-violation steps and projection-adjustment counts show that the implementation should not be read as a formal clearance-invariance proof. The Crazyflow full-sweep replay adds rotor-drag dynamics and downwash for a CASSA reference set and eliminates collision/contact events under the dynamics-aware replay reference settings; it nevertheless remains a simulation replay and should not be read as comparative physical validation across all controllers, as a low-rate perception proof, or as a dynamics-level strict safe-radius-clearance guarantee.
+
+The main local relative-state safety model assumes short-range relative-state availability through a local channel that is modeled separately from the nominal communication packet-loss stream. This assumption is useful for separating communication degradation from close-range safety response, but it does not instantiate a complete perception pipeline. Field-of-view occlusion, correlated perception failures, range-dependent missed detections, sensor saturation, localization drift, and multi-sensor estimator failure are not modeled in the main sweep.
+
+The absence of local-sensing degradation experiments is a deliberate scope limitation rather than an implicit robustness claim. The present evaluation isolates the nominal communication channel because close-range sensing failures would introduce a second independent failure source. A complete robustness study would require a separate experimental design that varies local dropout, estimator delay, missed detections, occlusion, field of view, and sensing noise, together with the interaction between those factors and nominal communication degradation. Future work should stress the local relative-state stream directly by adding local dropout, estimator delay, range-dependent missed detections, occlusion, field-of-view limits, and sensor noise, followed by a concrete sensing stack such as lidar, optical flow, ultra-wideband ranging, vision, or inter-vehicle relative localization and full vehicle-dynamics flight testing.
+
+\section{Conclusion}
+
+This paper presented CASSA as an architecture-level simulation study for large aerial swarms under degraded nominal communication, rather than as a new stand-alone collision-avoidance primitive or a formal continuous-time safety method. Under the idealized local relative-state safety interface and retained projection fallback, separating nominal communication-based coordination from close-range safety response allowed the architecture to maintain 255/255 simulator-level collision/contact safety successes under the implemented metric with 4 Hz nominal communication, local-safety, and obstacle-information updates, zero inter-agent collision pairs, and zero obstacle contacts. CASSA combines local pairwise shielding, crossing-flow speed governance, density-aware target-speed regulation, an acceleration-bounded command-level obstacle filter, and a reported projection fallback. All primary CASSA runs reached T99 within the 120 s horizon, with median T90/T95/T99 of 59.9/61.9/66.0 s. Scenario-wise results and command-filter telemetry identify dense obstacle corridors as the primary throughput and correction-telemetry bottleneck. A full Crazyflow replay of dynamics-aware CASSA references provided dynamics-consistency evidence with rotor-drag/downwash dynamics, 255/255 collision/contact safety successes under the replay metric, zero inter-agent collision-pair samples, zero obstacle contacts, maximum T99 of 104.0 s, and maximum tracking error of 0.217 m. These results support scalable simulation evidence for nominal-communication robustness under stated information-stream, dynamics, and projection assumptions, not end-to-end perception robustness, hardware validation, strict safe-radius clearance preservation, or a continuous-time formal proof.
+
+\section*{Data availability}
+
+The simulation code, configuration files, generated run indices, summary tables, and figures are contained in the project repository. The manuscript uses the repository data package for the matched simulator-interface sweep, final CASSA command-filter sweep, predictive surrogate sweep, external-package baseline sweep, command-filter telemetry, and Crazyflow dynamics-consistency replay.
+
+\section*{Conflict of interest}
+
+The authors declare no potential conflicts of interest with respect to the research, authorship, and/or publication of this article.
+
+\section*{Funding}
+
+Funding information will be provided in the submission metadata.
+
+\section*{Ethics approval and consent to participate}
+
+Not applicable. This simulation-based study does not involve human participants, animals, or identifiable personal data.
+
+\section*{Consent for publication}
+
+Not applicable.
+
+\bibliographystyle{unsrt}
+\bibliography{references}
+
+\end{document}

@@ -1,0 +1,6 @@
+Group,Runs,Safety success,Obstacle proj. adj.,Pairwise proj. adj.,Pre-proj obs. contacts,Clearance violation steps
+Overall,255,1.0,3571,18,0,3571
+Obstacle corridor,125,1.0,3472,18,0,3472
+Crossing traffic,90,1.0,99,0,0,99
+Merge--split,20,1.0,0,0,0,0
+Open flock,20,1.0,0,0,0,0
