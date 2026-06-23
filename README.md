@@ -2,13 +2,13 @@
 
 This repository contains the simulation code, experiment configurations, compact reference outputs, and manuscript assets for:
 
-**CASSA: A Scalable Communication-Aware Swarm Safety Architecture for Aerial Robot Navigation**
+**CASSA: A Communication-Aware Safety Stack for Large-Scale Aerial Swarm Simulation under Degraded Nominal Communication**
 
 The repository is intended to support reproduction of the simulation results reported in the IJARS manuscript. It is a standalone release derived from the working research tree and includes only the reported experiment configurations, post-processing scripts, current paper tables, Crazyflow replay interface, and demonstration animations.
 
 ## Scope
 
-CASSA is evaluated here as a simulator-level swarm safety architecture. The reported results use 4 Hz nominal communication, 4 Hz local relative-state safety sampling, and 4 Hz obstacle-information updates. The final CASSA settings are:
+CASSA is evaluated here as a simulator-level swarm safety stack. The reported results use 4 Hz nominal communication, 4 Hz local relative-state safety sampling, and 4 Hz obstacle-information updates. The final CASSA settings are:
 
 - `safe_radius_m=0.39`
 - `obstacle_clearance_margin_m=0.34`

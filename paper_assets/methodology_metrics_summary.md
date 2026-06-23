@@ -6,7 +6,7 @@
 
 ### 1.1 연구 범위
 
-- CASSA는 `Communication-Aware Swarm Safety Architecture`의 약어이다.
+- CASSA는 `Communication-Aware Swarm Safety Stack`의 약어이다.
 - 원고는 CASSA를 단일 충돌 회피 primitive 또는 formal safety certificate가 아니라 architecture-level simulation study로 정의한다.
 - 주 실험의 대상은 nominal communication degradation 조건에서 simulator-level collision/contact safety와 mission progress가 유지되는지이다.
 - 주 실험은 local perception stack 전체를 평가하지 않는다.
