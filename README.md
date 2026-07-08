@@ -127,6 +127,7 @@ Compact reference summaries from the manuscript version are stored in `expected_
 | --- | --- |
 | `expected_results/proposed_full_sweep/` | CASSA 4 Hz full-sweep summary JSON/CSV used for projection telemetry |
 | `expected_results/projection_disabled_sweep/` | Projection-disabled 255-run audit run index and OFF-vs-ON-reference summaries |
+| `expected_results/local_sensitivity_sweep/` | Local-safety stream sensitivity mini-sweep for the N=200 obstacle-corridor condition |
 | `expected_results/crazyflow_replay/` | Crazyflow 255-run summary and replay table reference |
 | `paper_assets/tables/` | Current manuscript table CSV/LaTeX files |
 | `paper_assets/methodology_metrics_summary.md` | Objective definitions of the main methods and reported metrics |
