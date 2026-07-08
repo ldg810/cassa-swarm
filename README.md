@@ -141,7 +141,7 @@ The wrapper script is provided for convenience. Individual stages can also be ru
 python -m experiments.run_batch --config configs/proposed_full_sweep.yaml --out results/proposed_full_sweep --workers 16
 python -m experiments.summarize_proposed_full --results results/proposed_full_sweep
 python -m experiments.run_batch --config configs/projection_disabled_full_sweep.yaml --out results/projection_disabled_sweep --workers 16
-python -m experiments.summarize_projection_disabled --results results/projection_disabled_sweep
+python -m experiments.summarize_projection_disabled --results results/projection_disabled_sweep --on-reference-results results/proposed_full_sweep
 python -m experiments.run_batch --config configs/classical_baselines_full_sweep.yaml --out results/classical_baselines_full_sweep --workers 16
 python -m experiments.run_batch --config configs/secondary_baselines_full_sweep.yaml --out results/secondary_baselines_full_sweep --workers 16
 python -m experiments.run_batch --config configs/external_package_baselines_full_sweep.yaml --out results/external_package_baselines_full_sweep --workers 16

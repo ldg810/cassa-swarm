@@ -52,12 +52,17 @@ def run_double_integrator(workers: int, overwrite: bool) -> None:
 
 def run_projection_disabled(workers: int, overwrite: bool) -> None:
     run_batch("projection_disabled_full_sweep.yaml", "projection_disabled_sweep", workers, overwrite)
+    on_reference = ROOT / "results" / "proposed_full_sweep"
+    if not (on_reference / "run_index.csv").exists():
+        on_reference = ROOT / "expected_results" / "proposed_full_sweep"
     run([
         sys.executable,
         "-m",
         "experiments.summarize_projection_disabled",
         "--results",
         ROOT / "results" / "projection_disabled_sweep",
+        "--on-reference-results",
+        on_reference,
     ])
 
 

@@ -423,10 +423,10 @@ Steps:
 - Obstacle or pairwise constraints가 final acceleration saturation 이후 서로 경쟁하는 경우 retained state-space projection fallback이 사용될 수 있다.
 - Projection fallback adjustment는 simulator telemetry로 기록된다.
 - Final 4 Hz CASSA full sweep에서 기록된 projection telemetry:
-  - obstacle-projection agent adjustments: 3,571
+  - obstacle-projection agent adjustments: 3,776
   - pairwise-projection agent adjustments: 18
   - post-integration/pre-projection obstacle contacts: 0
-  - conservative pre-projection clearance-violation steps: 3,571
+  - conservative pre-projection clearance-violation steps: 3,776
 
 ## 7. Simulation Setup
 
@@ -685,10 +685,10 @@ Table values correspond to final 4 Hz CASSA full sweep.
 
 | Group | Runs | Safety success | Obstacle projection adjustments | Pairwise projection adjustments | Pre-projection obstacle contacts | Clearance violation steps |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Overall | 255 | 1.00 | 3,571 | 18 | 0 | 3,571 |
+| Overall | 255 | 1.00 | 3,776 | 18 | 0 | 3,776 |
 | Obstacle corridor | 125 | 1.00 | 3,472 | 18 | 0 | 3,472 |
 | Crossing traffic | 90 | 1.00 | 99 | 0 | 0 | 99 |
-| Merge-split | 20 | 1.00 | 0 | 0 | 0 | 0 |
+| Merge-split | 20 | 1.00 | 205 | 0 | 0 | 205 |
 | Open flock | 20 | 1.00 | 0 | 0 | 0 | 0 |
 
 ## 15. Crazyflow Replay Method and Results
