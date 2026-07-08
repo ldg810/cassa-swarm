@@ -244,6 +244,10 @@ def _metadata_flag(spec: RunSpec, key: str) -> bool:
     return bool(spec.metadata.get(key, False))
 
 
+def _projection_globally_enabled(spec: RunSpec) -> bool:
+    return bool(spec.metadata.get("projection_enabled", True))
+
+
 def _metadata_float(spec: RunSpec, key: str, default: float) -> float:
     value = spec.metadata.get(key, default)
     try:
@@ -301,9 +305,16 @@ def _uses_pairwise_brake_v3(spec: RunSpec, traits) -> bool:
     return _uses_cassa_speed_governors(spec, traits) and _metadata_flag(spec, "enable_pairwise_brake_v3")
 
 
+def _uses_pairwise_projection_stack(spec: RunSpec, traits) -> bool:
+    return _uses_cassa_reference_stack(spec, traits) or _metadata_flag(spec, "enable_shared_pairwise_projection")
+
+
 def _uses_pairwise_projection(spec: RunSpec, traits) -> bool:
-    projection_stack = _uses_cassa_reference_stack(spec, traits) or _metadata_flag(spec, "enable_shared_pairwise_projection")
-    return projection_stack and not _metadata_flag(spec, "disable_pairwise_projection")
+    return (
+        _uses_pairwise_projection_stack(spec, traits)
+        and _projection_globally_enabled(spec)
+        and not _metadata_flag(spec, "disable_pairwise_projection")
+    )
 
 
 def _uses_obstacle_command_filter(spec: RunSpec, traits) -> bool:
@@ -320,6 +331,7 @@ def _uses_obstacle_projection(spec: RunSpec, traits) -> bool:
     projection_stack = _uses_cassa_reference_stack(spec, traits) or _metadata_flag(spec, "enable_shared_obstacle_projection")
     return (
         projection_stack
+        and _projection_globally_enabled(spec)
         and _metadata_flag(spec, "enable_obstacle_projection")
         and not _metadata_flag(spec, "disable_obstacle_projection")
     )
@@ -745,6 +757,33 @@ def _count_obstacle_contacts(positions: np.ndarray, obstacles: List[Obstacle], r
     return count
 
 
+def _min_obstacle_contact_boundary_margin(
+    positions: np.ndarray,
+    obstacles: List[Obstacle],
+    radius: float,
+    active_mask: np.ndarray | None = None,
+) -> float | None:
+    if not obstacles:
+        return None
+    active = (
+        np.ones(positions.shape[0], dtype=bool)
+        if active_mask is None
+        else np.asarray(active_mask, dtype=bool)
+    )
+    best: float | None = None
+    for obs in obstacles:
+        center = np.asarray(obs.center, dtype=float)
+        dxy = np.linalg.norm(positions[:, :2] - center[:2], axis=1)
+        z_ok = (positions[:, 2] >= obs.height_min) & (positions[:, 2] <= obs.height_max)
+        considered = z_ok & active
+        if not np.any(considered):
+            continue
+        margin = dxy[considered] - (float(obs.radius) + float(radius))
+        candidate = float(np.min(margin))
+        best = candidate if best is None else min(best, candidate)
+    return best
+
+
 def _obstacle_projection_clearance(spec: RunSpec, obstacle: Obstacle) -> float:
     return (
         float(obstacle.radius)
@@ -874,7 +913,20 @@ def _record_pre_projection_state(
     active_mask: np.ndarray | None,
     pairwise_projection_enabled: bool,
     obstacle_projection_enabled: bool,
+    pairwise_telemetry_enabled: bool | None = None,
+    obstacle_telemetry_enabled: bool | None = None,
 ) -> None:
+    pairwise_envelope_enabled = (
+        pairwise_projection_enabled
+        if pairwise_telemetry_enabled is None
+        else bool(pairwise_telemetry_enabled)
+    )
+    obstacle_envelope_enabled = (
+        obstacle_projection_enabled
+        if obstacle_telemetry_enabled is None
+        else bool(obstacle_telemetry_enabled)
+    )
+
     telemetry.pre_projection_state_checks += 1
     telemetry.pre_projection_collision_pairs += _count_active_pairs_within(
         positions,
@@ -888,7 +940,7 @@ def _record_pre_projection_state(
         active_mask,
     )
 
-    if pairwise_projection_enabled:
+    if pairwise_envelope_enabled:
         pairwise_clearance = spec.mav.collision_radius_m + 0.02
         pairs = _overlap_pairs(positions, pairwise_clearance, active_mask=active_mask)
         if pairs:
@@ -898,7 +950,7 @@ def _record_pre_projection_state(
             ], dtype=float)
             telemetry.record_pre_projection_pairwise(pairs, penetrations)
 
-    if obstacle_projection_enabled and obstacles:
+    if obstacle_envelope_enabled and obstacles:
         active = (
             np.ones(positions.shape[0], dtype=bool)
             if active_mask is None
@@ -1099,6 +1151,7 @@ def run_simulation(spec: RunSpec, out_dir: str | Path | None = None) -> Dict[str
     cumulative_messages = 0
     projection_telemetry = ProjectionTelemetry()
     min_distance_global = float("inf")
+    min_obstacle_contact_boundary_margin: float | None = None
     completion_time = None
     start_wall = time.perf_counter()
 
@@ -1130,6 +1183,18 @@ def run_simulation(spec: RunSpec, out_dir: str | Path | None = None) -> Dict[str
             spec.mav.collision_radius_m,
             active_mask,
         )
+        obstacle_contact_boundary_margin = _min_obstacle_contact_boundary_margin(
+            positions,
+            obstacles,
+            spec.mav.collision_radius_m,
+            active_mask,
+        )
+        if obstacle_contact_boundary_margin is not None:
+            min_obstacle_contact_boundary_margin = (
+                obstacle_contact_boundary_margin
+                if min_obstacle_contact_boundary_margin is None
+                else min(min_obstacle_contact_boundary_margin, obstacle_contact_boundary_margin)
+            )
         cumulative_collision_pairs += collision_pairs
         cumulative_safety_pairs += safety_pairs
         cumulative_obstacle_contacts += obstacle_contacts
@@ -1159,6 +1224,7 @@ def run_simulation(spec: RunSpec, out_dir: str | Path | None = None) -> Dict[str
                 "collision_pairs": collision_pairs,
                 "safety_violation_pairs": safety_pairs,
                 "obstacle_contacts": obstacle_contacts,
+                "obstacle_contact_boundary_margin_m": obstacle_contact_boundary_margin,
                 "reached_fraction": reached_fraction,
                 "mean_goal_distance_m": mean_goal_distance,
                 "order_parameter": order_parameter(velocities),
@@ -1295,12 +1361,13 @@ def run_simulation(spec: RunSpec, out_dir: str | Path | None = None) -> Dict[str
         positions, velocities = _apply_bounds(positions, velocities, arena_min, arena_max)
         if terminal_traffic_enabled and np.any(completed_mask):
             velocities[completed_mask] = 0.0
+        pairwise_projection_stack_enabled = _uses_pairwise_projection_stack(spec, traits)
         pairwise_projection_enabled = _uses_pairwise_projection(spec, traits)
         obstacle_projection_enabled = _uses_obstacle_projection(spec, traits)
         obstacle_filter_enabled = _uses_obstacle_command_filter(spec, traits)
         runtime_safety_active = (
             _uses_local_safety_layer(spec, traits)
-            or pairwise_projection_enabled
+            or pairwise_projection_stack_enabled
             or obstacle_projection_enabled
             or obstacle_filter_enabled
         )
@@ -1313,6 +1380,8 @@ def run_simulation(spec: RunSpec, out_dir: str | Path | None = None) -> Dict[str
                 active_mask,
                 pairwise_projection_enabled,
                 obstacle_projection_enabled or obstacle_filter_enabled,
+                pairwise_telemetry_enabled=pairwise_projection_stack_enabled,
+                obstacle_telemetry_enabled=obstacle_projection_enabled or obstacle_filter_enabled,
             )
             for _ in range(2):
                 if obstacle_projection_enabled:
@@ -1411,6 +1480,11 @@ def run_simulation(spec: RunSpec, out_dir: str | Path | None = None) -> Dict[str
         "horizon_s": spec.sim.horizon_s,
         "dt_s": spec.sim.dt_s,
         "min_inter_agent_distance_m": float(min_distance_global),
+        "min_obstacle_contact_boundary_margin_m": (
+            None
+            if min_obstacle_contact_boundary_margin is None
+            else float(min_obstacle_contact_boundary_margin)
+        ),
         "cumulative_collision_pairs": int(cumulative_collision_pairs),
         "collision_rate_per_pair_step": float(collision_rate_per_pair_step),
         "cumulative_safety_violation_pairs": int(cumulative_safety_pairs),

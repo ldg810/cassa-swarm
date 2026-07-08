@@ -1,0 +1,106 @@
+group,scenario_key,metric,projection_off,projection_on_reference
+Overall,overall,runs,255.0,255.0
+Overall,overall,safety_success_rate,0.996078431372549,1.0
+Overall,overall,inter_agent_collision_pair_samples,2.0,0.0
+Overall,overall,obstacle_contact_samples,0.0,0.0
+Overall,overall,T90_median_s,59.92857142857143,59.92857142857143
+Overall,overall,T90_reached_runs,255.0,255.0
+Overall,overall,T95_median_s,61.875,61.875
+Overall,overall,T95_reached_runs,255.0,255.0
+Overall,overall,T99_median_s,66.0,66.0
+Overall,overall,T99_reached_runs,255.0,255.0
+Overall,overall,mean_reached_fraction,0.9995686274509803,0.9995223529411765
+Overall,overall,obstacle_clearance_violation_agent_steps,137226.0,3571.0
+Overall,overall,pairwise_clearance_violation_pairs,9.0,9.0
+Overall,overall,clearance_envelope_violation_steps_total,137235.0,3580.0
+Overall,overall,max_conservative_envelope_penetration_m,0.145371725292644,0.042703204824753
+Overall,overall,obstacle_max_conservative_penetration_m,0.145371725292644,0.042703204824753
+Overall,overall,pairwise_max_conservative_penetration_m,0.0318123429717839,0.010169639279825
+Overall,overall,min_obstacle_contact_boundary_margin_m,0.2146282747073559,0.317297
+Overall,overall,min_inter_agent_distance_m,0.108187657028216,0.140001
+Overall,overall,obstacle_projection_agent_adjustments,0.0,3571.0
+Overall,overall,pairwise_projection_agent_adjustments,0.0,18.0
+Obstacle corridor,corridor_obstacles,runs,125.0,125.0
+Obstacle corridor,corridor_obstacles,safety_success_rate,0.992,1.0
+Obstacle corridor,corridor_obstacles,inter_agent_collision_pair_samples,2.0,0.0
+Obstacle corridor,corridor_obstacles,obstacle_contact_samples,0.0,0.0
+Obstacle corridor,corridor_obstacles,T90_median_s,68.7,68.75
+Obstacle corridor,corridor_obstacles,T90_reached_runs,125.0,125.0
+Obstacle corridor,corridor_obstacles,T95_median_s,71.5,71.5
+Obstacle corridor,corridor_obstacles,T95_reached_runs,125.0,125.0
+Obstacle corridor,corridor_obstacles,T99_median_s,77.0,76.5
+Obstacle corridor,corridor_obstacles,T99_reached_runs,125.0,125.0
+Obstacle corridor,corridor_obstacles,mean_reached_fraction,0.9991359999999999,0.999056
+Obstacle corridor,corridor_obstacles,obstacle_clearance_violation_agent_steps,127174.0,3472.0
+Obstacle corridor,corridor_obstacles,pairwise_clearance_violation_pairs,9.0,9.0
+Obstacle corridor,corridor_obstacles,clearance_envelope_violation_steps_total,127183.0,3481.0
+Obstacle corridor,corridor_obstacles,max_conservative_envelope_penetration_m,0.145371725292644,0.042703204824753
+Obstacle corridor,corridor_obstacles,obstacle_max_conservative_penetration_m,0.145371725292644,0.042703204824753
+Obstacle corridor,corridor_obstacles,pairwise_max_conservative_penetration_m,0.0318123429717839,0.010169639279825
+Obstacle corridor,corridor_obstacles,min_obstacle_contact_boundary_margin_m,0.2146282747073559,0.317297
+Obstacle corridor,corridor_obstacles,min_inter_agent_distance_m,0.108187657028216,0.140001
+Obstacle corridor,corridor_obstacles,obstacle_projection_agent_adjustments,0.0,3472.0
+Obstacle corridor,corridor_obstacles,pairwise_projection_agent_adjustments,0.0,18.0
+Crossing traffic,crossing_traffic,runs,90.0,90.0
+Crossing traffic,crossing_traffic,safety_success_rate,1.0,1.0
+Crossing traffic,crossing_traffic,inter_agent_collision_pair_samples,0.0,0.0
+Crossing traffic,crossing_traffic,obstacle_contact_samples,0.0,0.0
+Crossing traffic,crossing_traffic,T90_median_s,54.67613636363636,54.6875
+Crossing traffic,crossing_traffic,T90_reached_runs,90.0,90.0
+Crossing traffic,crossing_traffic,T95_median_s,55.650000000000006,55.725
+Crossing traffic,crossing_traffic,T95_reached_runs,90.0,90.0
+Crossing traffic,crossing_traffic,T99_median_s,58.25,58.25
+Crossing traffic,crossing_traffic,T99_reached_runs,90.0,90.0
+Crossing traffic,crossing_traffic,mean_reached_fraction,1.0,0.9999777777777779
+Crossing traffic,crossing_traffic,obstacle_clearance_violation_agent_steps,3224.0,99.0
+Crossing traffic,crossing_traffic,pairwise_clearance_violation_pairs,0.0,0.0
+Crossing traffic,crossing_traffic,clearance_envelope_violation_steps_total,3224.0,99.0
+Crossing traffic,crossing_traffic,max_conservative_envelope_penetration_m,0.1365747734895345,0.0358961633810535
+Crossing traffic,crossing_traffic,obstacle_max_conservative_penetration_m,0.1365747734895345,0.0358961633810535
+Crossing traffic,crossing_traffic,pairwise_max_conservative_penetration_m,0.0,0.0
+Crossing traffic,crossing_traffic,min_obstacle_contact_boundary_margin_m,0.2234252265104654,0.324104
+Crossing traffic,crossing_traffic,min_inter_agent_distance_m,0.2153363595394878,0.220035
+Crossing traffic,crossing_traffic,obstacle_projection_agent_adjustments,0.0,99.0
+Crossing traffic,crossing_traffic,pairwise_projection_agent_adjustments,0.0,0.0
+Merge--split,merge_split,runs,20.0,20.0
+Merge--split,merge_split,safety_success_rate,1.0,1.0
+Merge--split,merge_split,inter_agent_collision_pair_samples,0.0,0.0
+Merge--split,merge_split,obstacle_contact_samples,0.0,0.0
+Merge--split,merge_split,T90_median_s,58.20833333333333,58.28125
+Merge--split,merge_split,T90_reached_runs,20.0,20.0
+Merge--split,merge_split,T95_median_s,58.9375,59.10416666666667
+Merge--split,merge_split,T95_reached_runs,20.0,20.0
+Merge--split,merge_split,T99_median_s,60.29166666666667,60.625
+Merge--split,merge_split,T99_reached_runs,20.0,20.0
+Merge--split,merge_split,mean_reached_fraction,1.0,1.0
+Merge--split,merge_split,obstacle_clearance_violation_agent_steps,6828.0,0.0
+Merge--split,merge_split,pairwise_clearance_violation_pairs,0.0,0.0
+Merge--split,merge_split,clearance_envelope_violation_steps_total,6828.0,0.0
+Merge--split,merge_split,max_conservative_envelope_penetration_m,0.1379293932141061,0.0
+Merge--split,merge_split,obstacle_max_conservative_penetration_m,0.1379293932141061,0.0
+Merge--split,merge_split,pairwise_max_conservative_penetration_m,0.0,0.0
+Merge--split,merge_split,min_obstacle_contact_boundary_margin_m,0.2220706067858938,0.320632
+Merge--split,merge_split,min_inter_agent_distance_m,0.2400240608607284,0.220751
+Merge--split,merge_split,obstacle_projection_agent_adjustments,0.0,0.0
+Merge--split,merge_split,pairwise_projection_agent_adjustments,0.0,0.0
+Open flock,open_flock,runs,20.0,20.0
+Open flock,open_flock,safety_success_rate,1.0,1.0
+Open flock,open_flock,inter_agent_collision_pair_samples,0.0,0.0
+Open flock,open_flock,obstacle_contact_samples,0.0,0.0
+Open flock,open_flock,T90_median_s,51.725,51.725
+Open flock,open_flock,T90_reached_runs,20.0,20.0
+Open flock,open_flock,T95_median_s,52.3,52.3
+Open flock,open_flock,T95_reached_runs,20.0,20.0
+Open flock,open_flock,T99_median_s,53.70833333333333,53.70833333333333
+Open flock,open_flock,T99_reached_runs,20.0,20.0
+Open flock,open_flock,mean_reached_fraction,0.9999,0.9999
+Open flock,open_flock,obstacle_clearance_violation_agent_steps,0.0,0.0
+Open flock,open_flock,pairwise_clearance_violation_pairs,0.0,0.0
+Open flock,open_flock,clearance_envelope_violation_steps_total,0.0,0.0
+Open flock,open_flock,max_conservative_envelope_penetration_m,0.0,0.0
+Open flock,open_flock,obstacle_max_conservative_penetration_m,0.0,0.0
+Open flock,open_flock,pairwise_max_conservative_penetration_m,0.0,0.0
+Open flock,open_flock,min_obstacle_contact_boundary_margin_m,,
+Open flock,open_flock,min_inter_agent_distance_m,0.253520725275333,0.253521
+Open flock,open_flock,obstacle_projection_agent_adjustments,0.0,0.0
+Open flock,open_flock,pairwise_projection_agent_adjustments,0.0,0.0

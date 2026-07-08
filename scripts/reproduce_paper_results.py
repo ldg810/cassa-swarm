@@ -50,6 +50,17 @@ def run_double_integrator(workers: int, overwrite: bool) -> None:
     run_batch("seed_extension_120s.yaml", "seed_extension_120s", workers, overwrite)
 
 
+def run_projection_disabled(workers: int, overwrite: bool) -> None:
+    run_batch("projection_disabled_full_sweep.yaml", "projection_disabled_sweep", workers, overwrite)
+    run([
+        sys.executable,
+        "-m",
+        "experiments.summarize_projection_disabled",
+        "--results",
+        ROOT / "results" / "projection_disabled_sweep",
+    ])
+
+
 def run_tables_and_figures() -> None:
     proposed_summary = ROOT / "results" / "proposed_full_sweep" / "summary"
     classical_summary = ROOT / "results" / "classical_baselines_full_sweep" / "summary"
@@ -166,7 +177,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Reproduce IJARS paper simulations, tables, figures, and demos.")
     parser.add_argument(
         "target",
-        choices=["smoke", "double-integrator", "tables", "demo-gifs", "crazyflow", "all"],
+        choices=["smoke", "double-integrator", "projection-disabled", "tables", "demo-gifs", "crazyflow", "all"],
         help="Pipeline stage to run.",
     )
     parser.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) // 2))
@@ -181,6 +192,8 @@ def main() -> None:
         run_smoke(args.workers)
     elif args.target == "double-integrator":
         run_double_integrator(args.workers, args.overwrite)
+    elif args.target == "projection-disabled":
+        run_projection_disabled(args.workers, args.overwrite)
     elif args.target == "tables":
         run_tables_and_figures()
     elif args.target == "demo-gifs":

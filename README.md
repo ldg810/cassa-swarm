@@ -16,6 +16,11 @@ CASSA is evaluated here as a simulator-level swarm safety stack. The reported re
 - `obstacle_command_filter_lookahead_margin_m=0.90`
 - `enable_obstacle_projection=true`
 
+This release also includes a projection-disabled audit sweep. In that audit,
+the command-level obstacle braking filter, local safety shield, and speed
+governors remain enabled, while only the post-integration state-space
+projection fallback is disabled with `metadata.projection_enabled=false`.
+
 Only experiments reported in the current manuscript are retained in this release.
 
 ## Repository Contents
@@ -75,6 +80,7 @@ The smoke target runs two CASSA cases and two external-baseline cases, then veri
 
 ```bash
 python scripts/reproduce_paper_results.py double-integrator --workers 16
+python scripts/reproduce_paper_results.py projection-disabled --workers 16
 python scripts/reproduce_paper_results.py tables
 ```
 
@@ -83,6 +89,7 @@ The non-Crazyflow manuscript results are generated from the following configurat
 | Config | Output directory | Purpose |
 | --- | --- | --- |
 | `configs/proposed_full_sweep.yaml` | `results/proposed_full_sweep` | CASSA full sweep, threshold times, and projection telemetry |
+| `configs/projection_disabled_full_sweep.yaml` | `results/projection_disabled_sweep` | 255-run CASSA audit with only post-integration projection fallback disabled |
 | `configs/classical_baselines_full_sweep.yaml` | `results/classical_baselines_full_sweep` | Boids, APF, no-shield, and matched CASSA controller rows |
 | `configs/secondary_baselines_full_sweep.yaml` | `results/secondary_baselines_full_sweep` | Short-horizon predictive, MADER-inspired, ORCA/RVO, and internal CBF-QP surrogate rows |
 | `configs/external_package_baselines_full_sweep.yaml` | `results/external_package_baselines_full_sweep` | CBF-QP via OSQP and RVO2 package baseline rows |
@@ -119,6 +126,7 @@ Compact reference summaries from the manuscript version are stored in `expected_
 | Path | Contents |
 | --- | --- |
 | `expected_results/proposed_full_sweep/` | CASSA 4 Hz full-sweep summary JSON/CSV used for projection telemetry |
+| `expected_results/projection_disabled_sweep/` | Projection-disabled 255-run audit run index and OFF-vs-ON-reference summaries |
 | `expected_results/crazyflow_replay/` | Crazyflow 255-run summary and replay table reference |
 | `paper_assets/tables/` | Current manuscript table CSV/LaTeX files |
 | `paper_assets/methodology_metrics_summary.md` | Objective definitions of the main methods and reported metrics |
@@ -132,6 +140,8 @@ The wrapper script is provided for convenience. Individual stages can also be ru
 ```bash
 python -m experiments.run_batch --config configs/proposed_full_sweep.yaml --out results/proposed_full_sweep --workers 16
 python -m experiments.summarize_proposed_full --results results/proposed_full_sweep
+python -m experiments.run_batch --config configs/projection_disabled_full_sweep.yaml --out results/projection_disabled_sweep --workers 16
+python -m experiments.summarize_projection_disabled --results results/projection_disabled_sweep
 python -m experiments.run_batch --config configs/classical_baselines_full_sweep.yaml --out results/classical_baselines_full_sweep --workers 16
 python -m experiments.run_batch --config configs/secondary_baselines_full_sweep.yaml --out results/secondary_baselines_full_sweep --workers 16
 python -m experiments.run_batch --config configs/external_package_baselines_full_sweep.yaml --out results/external_package_baselines_full_sweep --workers 16

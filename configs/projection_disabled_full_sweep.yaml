@@ -1,0 +1,89 @@
+name: projection_disabled_full_sweep
+repeats: 5
+seeds: [0, 1, 2, 3, 4]
+sim:
+  dt_s: 0.05
+  horizon_s: 120.0
+  log_stride: 10
+  arena_min: [-42.0, -42.0, 0.3]
+  arena_max: [42.0, 42.0, 2.5]
+  save_trajectory: false
+  trajectory_stride: 10
+  completed_agents_leave_traffic: false
+mav:
+  mass_kg: 0.027
+  max_speed_mps: 1.5
+  max_accel_mps2: 3.0
+  collision_radius_m: 0.12
+  safe_radius_m: 0.39
+  safety_influence_m: 0.85
+  initial_spacing_scale: 1.05
+  terminal_slot_min_spacing_m: 0.50
+  obstacle_clearance_margin_m: 0.34
+comm:
+  comm_radius_m: 4.0
+  k_neighbors: 12
+  packet_loss: 0.0
+  latency_ms: 0.0
+  update_rate_hz: 4.0
+  obstacle_update_rate_hz: 4.0
+  position_noise_std_m: 0.015
+  velocity_noise_std_mps: 0.025
+  local_safety_dropout: 0.0
+  local_safety_latency_ms: 0.0
+  local_safety_update_rate_hz: 4.0
+  local_safety_position_noise_std_m: 0.0
+  local_safety_velocity_noise_std_mps: 0.0
+weights:
+  separation: 1.5
+  alignment: 0.3
+  cohesion: 0.08
+  goal: 5.0
+  obstacle: 2.5
+  boundary: 1.1
+  damping: 0.22
+  safety: 2.5
+  closing: 1.0
+projection_disabled_metadata: &projection_disabled_metadata
+  metadata.enable_pairwise_brake_v3: true
+  metadata.pairwise_brake_v3_radius_m: 1.20
+  metadata.pairwise_brake_v3_clearance_m: 0.42
+  metadata.pairwise_brake_v3_min_factor: 0.28
+  metadata.pairwise_brake_v3_priority_min_factor: 0.82
+  metadata.pairwise_brake_v3_closing_trigger_mps: 0.03
+  metadata.obstacle_command_filter_buffer_m: 0.15
+  metadata.obstacle_command_filter_lookahead_margin_m: 0.90
+  metadata.enable_obstacle_projection: true
+  metadata.projection_enabled: false
+  metadata.disable_pairwise_projection: true
+  metadata.disable_obstacle_projection: true
+blocks:
+  - name: proposed_scaling
+    scenarios: [open_flock, corridor_obstacles, crossing_traffic, merge_split]
+    controllers: [proposed]
+    n_agents: [50, 100, 200, 500]
+    packet_loss: [0.0]
+    latency_ms: [0.0]
+    <<: *projection_disabled_metadata
+  - name: proposed_packet_loss_robustness
+    scenarios: [corridor_obstacles, crossing_traffic]
+    controllers: [proposed]
+    n_agents: [100, 200]
+    packet_loss: [0.0, 0.1, 0.2, 0.4]
+    latency_ms: [50.0]
+    <<: *projection_disabled_metadata
+  - name: proposed_latency_robustness
+    scenarios: [corridor_obstacles, crossing_traffic]
+    controllers: [proposed]
+    n_agents: [100, 200]
+    packet_loss: [0.1]
+    latency_ms: [0.0, 50.0, 100.0, 200.0]
+    <<: *projection_disabled_metadata
+  - name: proposed_high_density_stress
+    scenarios: [corridor_obstacles]
+    controllers: [proposed]
+    n_agents: [500, 1000]
+    packet_loss: [0.0, 0.2]
+    latency_ms: [0.0, 100.0]
+    seeds: [0, 1, 2, 3, 4]
+    <<: *projection_disabled_metadata
